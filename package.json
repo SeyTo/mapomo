@@ -1,0 +1,10 @@
+{
+  "name": "mapomo",
+  "version": "1.0.0",
+  "description": "nodejs server based pomodoro",
+  "main": "index.js",
+  "repository": "https://github.com/SeyTo/mapomo.git",
+  "author": "rajibbajracharya@gmail.com",
+  "license": "MIT",
+  "private": false
+}
