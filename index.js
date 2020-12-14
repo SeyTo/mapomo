@@ -1,15 +1,14 @@
-const { strip } = require('colors');
 const express = require('express');
 const notifier = require('node-notifier');
-const { Pomodoro } = require('./pomodoro');
 const app = express();
 
 const port = 55555;
 
-const defaultPomoTime = 1
-const defaultBreakTime = 1
-const longBreakTime = 1
-const defaultSessions = 2
+const defaultPomoTime = 40
+const defaultBreakTime = 5
+const longBreakTime = 30
+const defaultSessions = 3
+const notificationTimeout = 10
 
 const pomoStatus = {
   STOP: 0,
@@ -56,7 +55,7 @@ function notify(message, id) {
   notifier.notify({
     title: 'Pomodoro',
     message: message,
-    timeout: 10000
+    timeout: notificationTimeout
   })
   log(message)
 }
@@ -76,6 +75,7 @@ function reset () {
 }
 
 app.get('/start', (req, res) => {
+  stopTogglerCount = 0
   if (_pomoStatus === pomoStatus.RUNNING) {
     notify(`Pomo(session: ${_currentSessionCount}) is already running`)
     return res.sendStatus(200)
@@ -91,7 +91,6 @@ app.get('/start', (req, res) => {
 
   runner = setInterval(function () {
     _currentTimeLeft--
-    log(_currentTimeLeft);
 
     // go to next state on timer run out
     if (_currentTimeLeft < 1) {
@@ -141,8 +140,8 @@ app.get('/start', (req, res) => {
       }
     }
 
-    if (_currentTimeLeft < 30000 && _pomoStatus === pomoStatus.RUNNING) {
-      if (_currentTimeLeft > 6000) {
+    if (_currentTimeLeft < 300 && _pomoStatus === pomoStatus.RUNNING) {
+      if (_currentTimeLeft > 300) {
         // 5 min left before break
         notify('5 min left before break. Begin closing your work', '5minnotif')
       } else {
@@ -159,18 +158,38 @@ app.get('/start', (req, res) => {
   res.sendStatus(200)
 })
 
+let stopTogglerCount = 0
+/**
+ * Calling pause twice in a row will cause the pomodoro to stop.
+ */
 app.get('/pause', (req, res) => {
   switch (_pomoStatus) {
     case pomoStatus.PAUSED:
+      if (stopTogglerCount === 1) { 
+        reset()
+        notify(`Pomodoro is stopping. Press pause again to close server`)
+        ++stopTogglerCount
+        return res.sendStatus(200)
+      }
+      notify(`Session(${_currentSessionCount}): is already paused. Press pause once again to stop`)
+      ++stopTogglerCount
+      break
     case pomoStatus.STOP:
-      notify(`Session(${_currentSessionCount}) is already stopped or paused`)
+      if (stopTogglerCount > 1) {
+        server.close()
+        notify(`Pomodoro is closing.`)
+        stopTogglerCount = 0
+        return res.sendStatus(200)
+      }
+      notify(`Pomodoro has already stopped.`)
+      ++stopTogglerCount
       return res.sendStatus(400)
   }
 
   // _currentTimeLeft does not change
   _previousStatus = _pomoStatus
   _pomoStatus = pomoStatus.PAUSED
-  clearInterval(runner)  
+  clearInterval(runner)
   notify(`Session(${_currentSessionCount}) paused`)
   res.sendStatus(200)
 })
@@ -200,6 +219,24 @@ app.get('/time', (req, res) => {
   return res.send(new String(_currentTimeLeft))
 })
 
-app.listen(port, () => {
+app.get('/status', (_, res) => {
+  return res.send(new String(getStatusString(_pomoStatus)))
+})
+
+app.get('/check', (_, res) => {
+  notify(`Status: ${getStatusString(_pomoStatus)}\nTime Left: ${_currentTimeLeft/60} min`)
+  res.sendStatus(200)
+})
+
+var server = app.listen(port, () => {
   console.log(`Pomodoro server at localhost:${port}`)
+})
+
+app.get('/kill', (_, res) => {
+  server.close() 
+  return res.sendStatus(200)
+})
+
+app.get('/ping', (_, res) => {
+  return res.send("pong")
 })
