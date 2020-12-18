@@ -1,7 +1,9 @@
 #!/bin/bash
 
+SCRIPTPATH="/home/rj/_proj/mapomo"
+
 function check_server_running () {
-  if [ `curl -o - localhost:55555/ping` = 'pong' ]; then
+  if [ `curl --silent -o - localhost:55555/ping` = 'pong' ]; then
     echo 1
   else
     echo 0
@@ -18,8 +20,12 @@ if [ "$1" = 's' ]; then
     echo server already running
     start_pomo
   else
-    node `pwd`/`dirname "$0"`/index.js &disown
-    until [ "`curl -o - localhost:55555/time`" = '"0"' ]
+    echo starting a fresh server
+    echo $SCRIPTPATH/index.js
+    cd $SCRIPTPATH
+    /usr/bin/node index.js &disown
+
+    until [ "`curl --silent -o - localhost:55555/ping`" = 'pong' ]
     do
       echo waiting on server
       sleep 1
